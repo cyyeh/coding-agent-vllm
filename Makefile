@@ -1,4 +1,4 @@
-.PHONY: help venv install serve cc
+.PHONY: help venv install serve cc codex
 
 ifneq (,$(wildcard .env))
     include .env
@@ -9,13 +9,15 @@ VLLM ?= .venv/bin/vllm
 SERVED_MODEL_NAME ?= vllm-model
 TOOL_CALL_PARSER ?= pythonic
 VLLM_BASE_URL ?= http://localhost:8000
+VLLM_API_KEY ?= dummy
 
 help:
 	@echo "Targets:"
 	@echo "  venv         Create the .venv with Python 3.12"
 	@echo "  install      Install vLLM from PR #41703 (DFlash speculative decoding support)"
 	@echo "  serve        Launch vLLM serving Gemma 4 26B with the DFlash draft model"
-	@echo "  cc  		  Launch Claude Code routed to the local vLLM server"
+	@echo "  cc           Launch Claude Code routed to the local vLLM server"
+	@echo "  codex        Launch Codex routed to the local vLLM server"
 
 venv:
 	uv venv
@@ -37,8 +39,17 @@ serve:
 cc:
 	ANTHROPIC_BASE_URL=$(VLLM_BASE_URL) \
 	ANTHROPIC_API_KEY=dummy \
-	ANTHROPIC_AUTH_TOKEN=dummy \
 	ANTHROPIC_DEFAULT_OPUS_MODEL=$(SERVED_MODEL_NAME) \
 	ANTHROPIC_DEFAULT_SONNET_MODEL=$(SERVED_MODEL_NAME) \
 	ANTHROPIC_DEFAULT_HAIKU_MODEL=$(SERVED_MODEL_NAME) \
-	claude
+	claude --effort max
+
+codex:
+	VLLM_API_KEY=$(VLLM_API_KEY) \
+	codex \
+		-c model=$(SERVED_MODEL_NAME) \
+		-c model_provider=vllm \
+		-c 'model_providers.vllm.name="vLLM"' \
+		-c 'model_providers.vllm.env_key="VLLM_API_KEY"' \
+		-c 'model_providers.vllm.base_url="$(VLLM_BASE_URL)/v1"' \
+		-c 'model_providers.vllm.wire_api="responses"'

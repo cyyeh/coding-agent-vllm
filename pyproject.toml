@@ -1,5 +1,5 @@
 [project]
-name = "cc-vllm"
+name = "coding-agent-vllm"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

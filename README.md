@@ -1,6 +1,6 @@
-# cc-vllm
+# coding-agent-vllm
 
-> Run Claude Code against a self-hosted vLLM backend — Gemma 4 26B accelerated with DFlash block-diffusion speculative decoding.
+> Run Claude Code or Codex against a self-hosted vLLM backend — Gemma 4 26B accelerated with DFlash block-diffusion speculative decoding.
 
 Local vLLM server for [`google/gemma-4-26B-A4B-it`](https://huggingface.co/google/gemma-4-26B-A4B-it) with [`z-lab/gemma-4-26B-A4B-it-DFlash`](https://huggingface.co/z-lab/gemma-4-26B-A4B-it-DFlash) as the speculative draft model.
 
@@ -29,7 +29,7 @@ make install
 make serve
 ```
 
-The Makefile auto-loads `.env`, so `HF_TOKEN` is exported to the vLLM process. The OpenAI-compatible API listens on `http://0.0.0.0:8000` and is also served under the Anthropic-compatible path expected by Claude Code.
+The Makefile auto-loads `.env`, so `HF_TOKEN` is exported to the vLLM process. The OpenAI-compatible API listens on `http://0.0.0.0:8000` and is also served under the Anthropic-compatible path expected by Claude Code, so the same server feeds both `make cc` and `make codex`.
 
 ## Use with Claude Code
 
@@ -40,6 +40,16 @@ make cc
 ```
 
 This starts Claude Code with `ANTHROPIC_BASE_URL` pointed at the local server and all three model tiers mapped to the served name `vllm-model`. See the [vLLM × Claude Code guide](https://docs.vllm.ai/en/stable/serving/integrations/claude_code/) for details.
+
+## Use with Codex
+
+With [Codex](https://github.com/openai/codex) installed, in a second shell with the server running:
+
+```bash
+make codex
+```
+
+This launches Codex with `model_provider=vllm` and the OpenAI Responses API wire format pointing at the local vLLM server. Provider settings are passed inline via Codex `-c` flags, so no `~/.codex/config.toml` edits are needed. See the [vLLM × Codex guide](https://docs.vllm.ai/en/latest/serving/integrations/codex/) for details.
 
 ## Configuration
 
@@ -55,7 +65,7 @@ This starts Claude Code with `ANTHROPIC_BASE_URL` pointed at the local server an
 | Tool-call parser              | `pythonic`     |
 | `trust_remote_code`           | enabled        |
 
-Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes` or `make cc SERVED_MODEL_NAME=my-model`.
+Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes`, `make cc SERVED_MODEL_NAME=my-model`, or `make codex VLLM_BASE_URL=http://remote:8000`.
 
 ## License
 
