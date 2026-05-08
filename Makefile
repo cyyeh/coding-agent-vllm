@@ -1,4 +1,5 @@
 .PHONY: help venv install patch serve serve-no-spec warmup warmup-diag chat cc codex bench bench-sharegpt
+.DELETE_ON_ERROR:
 
 ifneq (,$(wildcard .env))
     include .env
