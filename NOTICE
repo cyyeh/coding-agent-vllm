@@ -1,0 +1,8 @@
+coding-agent-vllm
+Copyright 2026 ChihYu Yeh
+
+This product includes software developed by meanaverage:
+  - scripts/patch_vllm_gb10_gemma4_dflash_runtime.py
+    Source: https://github.com/meanaverage/gemma4-dflash-spark-vllm
+    Licensed under the Apache License, Version 2.0
+    https://www.apache.org/licenses/LICENSE-2.0
