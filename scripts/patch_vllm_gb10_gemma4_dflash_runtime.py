@@ -4,6 +4,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Original copyright retained per Apache-2.0 §4(b)/(d).
 # See repo root NOTICE for required attribution text.
+#
+# Local modifications:
+#   - patch_w8a8_utils: added idempotency guard. Upstream's `def`-line
+#     regexes still match after patching, so re-runs prepended another
+#     `return False`. Our guard short-circuits when the patch marker is
+#     already present.
 from __future__ import annotations
 
 import re
@@ -30,6 +36,8 @@ def ensure_contains_once(text: str, marker: str, replacement: str) -> tuple[str,
 def patch_w8a8_utils(pkg_root: Path) -> bool:
     target = pkg_root / "model_executor/layers/quantization/utils/w8a8_utils.py"
     text = target.read_text()
+    if "Patched for Spark GB10" in text:
+        return False
     changed = False
 
     for old, new in [
