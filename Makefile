@@ -18,6 +18,8 @@ BENCH_NUM_PROMPTS ?= 200
 BENCH_REQUEST_RATE ?= inf
 BENCH_RANDOM_INPUT_LEN ?= 1024
 BENCH_RANDOM_OUTPUT_LEN ?= 256
+SHAREGPT_PATH ?= data/ShareGPT_V3_unfiltered_cleaned_split.json
+SHAREGPT_URL ?= https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json
 
 help:
 	@echo "Targets:"
@@ -32,6 +34,7 @@ help:
 	@echo "  cc           Launch Claude Code routed to the local vLLM server"
 	@echo "  codex        Launch Codex routed to the local vLLM server"
 	@echo "  bench        Benchmark the running server with vllm bench serve (random dataset)"
+	@echo "  bench-sharegpt Benchmark the running server with vllm bench serve (ShareGPT V3, downloaded on first run)"
 
 venv:
 	uv venv
@@ -114,5 +117,20 @@ bench:
 		--dataset-name random \
 		--random-input-len $(BENCH_RANDOM_INPUT_LEN) \
 		--random-output-len $(BENCH_RANDOM_OUTPUT_LEN) \
+		--num-prompts $(BENCH_NUM_PROMPTS) \
+		--request-rate $(BENCH_REQUEST_RATE)
+
+$(SHAREGPT_PATH):
+	mkdir -p $(dir $(SHAREGPT_PATH))
+	curl -L --fail -o $@ $(SHAREGPT_URL)
+
+bench-sharegpt: $(SHAREGPT_PATH)
+	$(VLLM) bench serve \
+		--backend openai-chat \
+		--model $(SERVED_MODEL_NAME) \
+		--base-url $(VLLM_BASE_URL) \
+		--endpoint /v1/chat/completions \
+		--dataset-name sharegpt \
+		--dataset-path $(SHAREGPT_PATH) \
 		--num-prompts $(BENCH_NUM_PROMPTS) \
 		--request-rate $(BENCH_REQUEST_RATE)
