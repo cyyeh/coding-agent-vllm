@@ -23,9 +23,23 @@ make venv
 make install
 ```
 
-`make install` pulls a pinned vLLM nightly wheel from the vLLM nightly index, then automatically runs `make patch` to apply three GB10-specific patches to the installed `vllm` package (disable CUTLASS FP8 paths on GB10, enable non-causal Triton attention, pin the DFlash draft to FlashAttention).
+`make install` pulls a pinned vLLM nightly wheel from the vLLM nightly index, then automatically runs `make patch` to adapt the installed `vllm` package for GB10 / Blackwell SM_121 + DFlash. See [Patches](#patches) for details.
 
-The patches are vendored from [`meanaverage/gemma4-dflash-spark-vllm`](https://github.com/meanaverage/gemma4-dflash-spark-vllm) (Apache-2.0; see `NOTICE`). They are *file rewrites* of the installed `vllm` site-packages tree — if you later run `pip install -U vllm` and the wheel changes, re-run `make patch` to re-apply them.
+## Patches
+
+`scripts/patch_vllm_gb10_gemma4_dflash_runtime.py` rewrites three files inside the installed `vllm` site-packages tree (it edits source on disk and clears `__pycache__` — not runtime monkey-patching). The script is vendored from [`meanaverage/gemma4-dflash-spark-vllm`](https://github.com/meanaverage/gemma4-dflash-spark-vllm) (Apache-2.0; see `NOTICE`), with one local change: an idempotency guard in `patch_w8a8_utils` so re-running `make patch` is safe.
+
+What each patch does:
+
+- **`patch_w8a8_utils`** — forces `cutlass_fp8_supported()` and the `CUTLASS_FP8_SUPPORTED` module flag to `False`. Only relevant if you switch the target to FP8 quantization (which we don't on the BF16 26B path) — at that point the patch routes around CUTLASS FP8 kernels that don't have GB10 prebuilt coverage. No-op at runtime for the default config; kept for parity with upstream.
+
+- **`patch_triton_backend`** — adds `supports_non_causal()` returning `True` on `TritonAttnBackend`. DFlash's initialization probes the backend for non-causal support; the unpatched class returns `False`, which aborts startup before any model is loaded. Required even though the Triton backend is *also* what vLLM auto-selects for the target verifier (because Gemma-4 has heterogeneous head dimensions — vLLM hard-pins target attention to Triton to avoid mixed-backend numerical divergence).
+
+- **`patch_qwen3_dflash`** — injects `attn_backend=FlashAttentionBackend` into the DFlash draft model's `Attention()` constructor. Pins the draft layer to FlashAttention v2 regardless of vLLM's selector (which would otherwise route the draft to Triton via the same heterogeneous-head-dim policy that locks the target). The DFlash draft is the only place FlashAttention runs in this setup.
+
+The patcher is idempotent — re-running `make patch` against an already-patched install prints `already-patched` for each file and writes nothing.
+
+If you ever run `uv pip install -U vllm` (or any operation that reinstalls the wheel), the patched files are overwritten. Run `make patch` again afterward.
 
 ## Run
 
@@ -34,6 +48,24 @@ make serve
 ```
 
 The Makefile auto-loads `.env`, so `HF_TOKEN` is exported to the vLLM process. The OpenAI-compatible API listens on `http://0.0.0.0:8000` and is also served under the Anthropic-compatible path expected by Claude Code, so the same server feeds both `make cc` and `make codex`.
+
+### First-run warmup (optional)
+
+After the server reports `Application startup complete`, in another shell:
+
+```bash
+make warmup
+```
+
+This sends a short and a ~5K-token prompt at the running server to JIT-compile Triton kernels that vLLM's internal startup warmup misses (DFlash spec-decoding kernels, longer-context prefill attention). One-time cost is ~1–2 minutes; the compiled kernels land in `~/.triton/cache`, so subsequent `make serve` boots on the same machine reuse them and don't need this step.
+
+For broader coverage, run:
+
+```bash
+make warmup-diag
+```
+
+This sweeps every M-bin that `fused_moe_kernel` selects a distinct `(BLOCK_SIZE_M, num_warps, num_stages)` tuple for (≤32, 33–96, 97–128, 129–512, >512 small/medium/large), then runs a ~20K-token prefill and a batch=2 concurrent decode, snapshots `~/.triton/cache` between every step, and prints each new compile by kernel name and config. Use when a real workload still triggers a JIT compile that `make warmup` didn't catch, or to verify that a new vLLM/DFlash build hits the same kernel set as before.
 
 ## Use with Claude Code
 
@@ -61,11 +93,10 @@ This launches Codex with `model_provider=vllm` and the OpenAI Responses API wire
 | --------------------------- | ---------------------------------- |
 | Served model name           | `vllm-model`                       |
 | Speculative method          | `dflash`                           |
-| Speculative tokens per step | 15                                 |
-| Max model length            | 16384                              |
-| Max batched tokens          | 16384                              |
+| Speculative tokens per step | 8                                  |
+| Max model length            | 32768                              |
+| Max batched tokens          | 32768                              |
 | GPU memory utilization      | 0.80                               |
-| Eager mode                  | enabled (`--enforce-eager`)        |
 | Multimodal                  | disabled (text-only)               |
 | Tool calling                | auto                               |
 | Tool-call parser            | `gemma4`                           |
