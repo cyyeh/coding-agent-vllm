@@ -120,16 +120,49 @@ def phase_prefill_sweep() -> None:
         print(f"ok ({elapsed:.1f}s) -> {text.strip()[:48]!r}")
 
 
+SAMPLING_CONFIGS: list[tuple[str, dict]] = [
+    (
+        "B.1 sampling temp=0.7 top_p=0.95",
+        {"temperature": 0.7, "top_p": 0.95, "max_tokens": 64},
+    ),
+    (
+        "B.2 sampling temp=1.0 top_k=50",
+        {"temperature": 1.0, "top_k": 50, "max_tokens": 64},
+    ),
+    (
+        "B.3 sampling temp=0.8 top_p=0.9 presence=0.5",
+        {
+            "temperature": 0.8,
+            "top_p": 0.9,
+            "presence_penalty": 0.5,
+            "max_tokens": 64,
+        },
+    ),
+]
+
+
+def phase_sampling_sweep() -> None:
+    print("phase B: sampling sweep")
+    prompt = make_prompt(120)
+    for label, kwargs in SAMPLING_CONFIGS:
+        print(f"  [{label}] ...", end=" ", flush=True)
+        kwargs_copy = dict(kwargs)
+        max_tokens = kwargs_copy.pop("max_tokens")
+        elapsed, text = post_chat(prompt, max_tokens=max_tokens, **kwargs_copy)
+        print(f"ok ({elapsed:.1f}s) -> {text.strip()[:48]!r}")
+
+
 def main() -> int:
     print(f"warming up {BASE_URL} (model={MODEL})", flush=True)
     t_start = time.monotonic()
     try:
         phase_prefill_sweep()
+        phase_sampling_sweep()
     except urllib.error.URLError as exc:
         print(f"FAIL: {exc}")
         return 1
     total = time.monotonic() - t_start
-    print(f"warmup complete (total: {total:.1f}s, steps: 8)")
+    print(f"warmup complete (total: {total:.1f}s, steps: 11)")
     return 0
 
 
