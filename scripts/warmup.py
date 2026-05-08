@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """Warm up Triton/JIT kernels on the running vLLM server.
 
-Sends two chat completions to the locally-running vLLM:
-  1. A short prompt (covers DFlash spec-decoding kernels and the
-     common decode-path shapes).
-  2. A ~5K-token prompt (covers prefill-attention kernels at sizes
-     vLLM's internal startup warmup typically misses).
+Drives the locally-running vLLM with a four-phase request schedule that
+pre-JITs every Triton kernel real Claude Code / Codex traffic against the
+configured DGX Spark + Gemma-4 26B + DFlash stack will plausibly hit:
 
-The first cold run JITs each Triton kernel for the shape/dtype it
-sees and writes the result to ~/.triton/cache, so subsequent server
-starts on the same machine reuse the compiled artifacts and don't
+    Phase A — prefill M-bin sweep (greedy, batch=1)
+    Phase B — sampling sweep (non-greedy, batch=1)
+    Phase C — concurrent decode (batch=2 and batch=3)
+    Phase D — sustained decode (long generation, non-greedy)
+
+The first cold run JITs each Triton kernel for the shape/dtype/sampling
+config it sees and writes the result to ~/.triton/cache, so subsequent
+server starts on the same machine reuse the compiled artifacts and don't
 need this script.
 
-Reads VLLM_BASE_URL, VLLM_API_KEY, and SERVED_MODEL_NAME from env
-with the same defaults the Makefile uses.
+Reads VLLM_BASE_URL, VLLM_API_KEY, and SERVED_MODEL_NAME from env with
+the same defaults the Makefile uses.
 """
 from __future__ import annotations
 
@@ -97,30 +100,36 @@ def run_concurrent(
         return [f.result() for f in futures]
 
 
+PREFILL_BIN_TARGETS: list[tuple[str, int]] = [
+    ("A.1 prefill ~16 tokens (M-bin <=32)",      16),
+    ("A.2 prefill ~72 tokens (M-bin 33-96)",     72),
+    ("A.3 prefill ~120 tokens (M-bin 97-128)",  120),
+    ("A.4 prefill ~400 tokens (M-bin 129-512)", 400),
+    ("A.5 prefill ~2000 tokens (M-bin >512 sm)", 2_000),
+    ("A.6 prefill ~8000 tokens (M-bin >512 md)", 8_000),
+    ("A.7 prefill ~14000 tokens (M-bin >512 lg)", 14_000),
+    ("A.8 prefill ~20000 tokens (long sustained)", 20_000),
+]
+
+
+def phase_prefill_sweep() -> None:
+    print("phase A: prefill M-bin sweep")
+    for label, n in PREFILL_BIN_TARGETS:
+        print(f"  [{label}] ...", end=" ", flush=True)
+        elapsed, text = post_chat(make_prompt(n), max_tokens=8)
+        print(f"ok ({elapsed:.1f}s) -> {text.strip()[:48]!r}")
+
+
 def main() -> int:
     print(f"warming up {BASE_URL} (model={MODEL})", flush=True)
-
-    print("  1/2 short prompt ...", end=" ", flush=True)
+    t_start = time.monotonic()
     try:
-        elapsed, text = post_chat("Say hi in one word.", max_tokens=16)
+        phase_prefill_sweep()
     except urllib.error.URLError as exc:
         print(f"FAIL: {exc}")
         return 1
-    print(f"ok ({elapsed:.1f}s) -> {text.strip()!r}")
-
-    filler = "lorem ipsum dolor sit amet consectetur adipiscing elit. " * 400
-    long_prompt = f"{filler}\n\nIn five words, summarize the above."
-    approx_tokens = len(long_prompt) // 4
-
-    print(f"  2/2 long prompt (~{approx_tokens} tokens) ...", end=" ", flush=True)
-    try:
-        elapsed, text = post_chat(long_prompt, max_tokens=32)
-    except urllib.error.URLError as exc:
-        print(f"FAIL: {exc}")
-        return 1
-    print(f"ok ({elapsed:.1f}s) -> {text.strip()[:60]!r}")
-
-    print("warmup complete")
+    total = time.monotonic() - t_start
+    print(f"warmup complete (total: {total:.1f}s, steps: 8)")
     return 0
 
 
