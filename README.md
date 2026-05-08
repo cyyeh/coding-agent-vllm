@@ -1,6 +1,6 @@
 # coding-agent-vllm
 
-> Run Claude Code or Codex against a self-hosted vLLM backend — Gemma 4 26B accelerated with DFlash block-diffusion speculative decoding.
+> Run Claude Code or Codex against a self-hosted vLLM backend on NVIDIA DGX Spark — Gemma 4 26B accelerated with DFlash block-diffusion speculative decoding.
 
 Local vLLM server for [`google/gemma-4-26B-A4B-it`](https://huggingface.co/google/gemma-4-26B-A4B-it) with [`z-lab/gemma-4-26B-A4B-it-DFlash`](https://huggingface.co/z-lab/gemma-4-26B-A4B-it-DFlash) as the speculative draft model.
 
@@ -8,10 +8,12 @@ DFlash uses block diffusion to draft multiple tokens in parallel, reportedly del
 
 ## Prerequisites
 
+- NVIDIA DGX Spark (aarch64, GB10 / Blackwell SM_121, Ubuntu 24.04)
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
-- NVIDIA GPU with recent CUDA drivers
 - Hugging Face account with access granted to `google/gemma-4-26B-A4B-it`
+
+This setup targets DGX Spark only. For traditional x86_64 + CUDA hosts, see upstream vLLM directly.
 
 ## Setup
 
@@ -21,7 +23,9 @@ make venv
 make install
 ```
 
-`make install` builds vLLM from [PR #41703](https://github.com/vllm-project/vllm/pull/41703), which adds the `dflash` speculative method.
+`make install` pulls a pinned vLLM nightly wheel from the vLLM nightly index, then automatically runs `make patch` to apply three GB10-specific patches to the installed `vllm` package (disable CUTLASS FP8 paths on GB10, enable non-causal Triton attention, pin the DFlash draft to FlashAttention).
+
+The patches are vendored from [`meanaverage/gemma4-dflash-spark-vllm`](https://github.com/meanaverage/gemma4-dflash-spark-vllm) (Apache-2.0; see `NOTICE`). They are *file rewrites* of the installed `vllm` site-packages tree — if you later run `pip install -U vllm` and the wheel changes, re-run `make patch` to re-apply them.
 
 ## Run
 
@@ -53,20 +57,25 @@ This launches Codex with `model_provider=vllm` and the OpenAI Responses API wire
 
 ## Configuration
 
-| Setting                       | Value          |
-| ----------------------------- | -------------- |
-| Served model name             | `vllm-model`   |
-| Speculative method            | `dflash`       |
-| Speculative tokens per step   | 15             |
-| Draft attention backend       | `flash_attn`   |
-| Target attention backend      | `triton_attn`  |
-| Max batched tokens            | 32768          |
-| Tool calling                  | auto           |
-| Tool-call parser              | `pythonic`     |
-| `trust_remote_code`           | enabled        |
+| Setting                     | Value                              |
+| --------------------------- | ---------------------------------- |
+| Served model name           | `vllm-model`                       |
+| Speculative method          | `dflash`                           |
+| Speculative tokens per step | 15                                 |
+| Max model length            | 16384                              |
+| Max batched tokens          | 16384                              |
+| GPU memory utilization      | 0.80                               |
+| Eager mode                  | enabled (`--enforce-eager`)        |
+| Multimodal                  | disabled (text-only)               |
+| Tool calling                | auto                               |
+| Tool-call parser            | `gemma4`                           |
+| Reasoning parser            | `gemma4`                           |
+| `trust_remote_code`         | enabled                            |
 
 Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes`, `make cc SERVED_MODEL_NAME=my-model`, or `make codex VLLM_BASE_URL=http://remote:8000`.
 
 ## License
 
 [MIT](LICENSE) © 2026 ChihYu Yeh
+
+Vendored components retain their original licenses; see `NOTICE`.
