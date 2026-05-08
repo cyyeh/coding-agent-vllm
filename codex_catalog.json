@@ -1,0 +1,26 @@
+{
+  "models": [
+    {
+      "slug": "vllm-model",
+      "display_name": "vllm-model",
+      "description": null,
+      "supported_reasoning_levels": [],
+      "shell_type": "default",
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 1,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "",
+      "supports_reasoning_summaries": false,
+      "support_verbosity": false,
+      "default_verbosity": null,
+      "apply_patch_tool_type": null,
+      "truncation_policy": {"mode": "bytes", "limit": 10000},
+      "supports_parallel_tool_calls": false,
+      "experimental_supported_tools": [],
+      "context_window": 16384,
+      "max_context_window": 16384
+    }
+  ]
+}
