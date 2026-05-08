@@ -109,13 +109,13 @@ Tunables (defaults shown):
 | `BENCH_NUM_PROMPTS`      | `200`   | Total requests sent during the run.                      |
 | `BENCH_REQUEST_RATE`     | `inf`   | Requests per second. `inf` = max throughput, no pacing.  |
 | `BENCH_RANDOM_INPUT_LEN` | `1024`  | Synthetic prompt length in tokens.                       |
-| `BENCH_RANDOM_OUTPUT_LEN`| `256`   | Synthetic decode length in tokens.                       |
+| `BENCH_RANDOM_OUTPUT_LEN` | `256`   | Synthetic decode length in tokens.                       |
 
 Example: `make bench BENCH_NUM_PROMPTS=500 BENCH_REQUEST_RATE=8`.
 
 ### `make bench-sharegpt` (real chat workload)
 
-Hits `/v1/chat/completions` with ShareGPT V3 multi-turn conversations — the same code path Claude Code and Codex use, including chat templating overhead. Use this when the number you want is "what will real agent traffic look like".
+Hits `/v1/chat/completions` with ShareGPT V3 multi-turn conversations — exercises chat templating overhead on the same model Claude Code and Codex use. Use this when the number you want is "what will real agent traffic look like".
 
 The dataset (~620 MB JSON) is downloaded on first invocation to `data/ShareGPT_V3_unfiltered_cleaned_split.json` and cached. `data/` is gitignored. Override `SHAREGPT_PATH` to use an existing copy, or `SHAREGPT_URL` to pull from a different mirror.
 
