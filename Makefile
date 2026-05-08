@@ -1,4 +1,4 @@
-.PHONY: help venv install serve claude-code
+.PHONY: help venv install serve cc
 
 ifneq (,$(wildcard .env))
     include .env
@@ -15,7 +15,7 @@ help:
 	@echo "  venv         Create the .venv with Python 3.12"
 	@echo "  install      Install vLLM from PR #41703 (DFlash speculative decoding support)"
 	@echo "  serve        Launch vLLM serving Gemma 4 26B with the DFlash draft model"
-	@echo "  claude-code  Launch Claude Code routed to the local vLLM server"
+	@echo "  cc  		  Launch Claude Code routed to the local vLLM server"
 
 venv:
 	uv venv
@@ -34,7 +34,7 @@ serve:
 		--max-num-batched-tokens 32768 \
 		--trust-remote-code
 
-claude-code:
+cc:
 	ANTHROPIC_BASE_URL=$(VLLM_BASE_URL) \
 	ANTHROPIC_API_KEY=dummy \
 	ANTHROPIC_AUTH_TOKEN=dummy \

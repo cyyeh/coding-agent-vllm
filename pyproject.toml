@@ -1,5 +1,5 @@
 [project]
-name = "claude-code-vllm"
+name = "cc-vllm"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

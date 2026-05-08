@@ -1,4 +1,4 @@
-# claude-code-vllm
+# cc-vllm
 
 > Run Claude Code against a self-hosted vLLM backend — Gemma 4 26B accelerated with DFlash block-diffusion speculative decoding.
 
@@ -36,7 +36,7 @@ The Makefile auto-loads `.env`, so `HF_TOKEN` is exported to the vLLM process. T
 In a second shell, with the server running:
 
 ```bash
-make claude-code
+make cc
 ```
 
 This starts Claude Code with `ANTHROPIC_BASE_URL` pointed at the local server and all three model tiers mapped to the served name `vllm-model`. See the [vLLM × Claude Code guide](https://docs.vllm.ai/en/stable/serving/integrations/claude_code/) for details.
@@ -55,7 +55,7 @@ This starts Claude Code with `ANTHROPIC_BASE_URL` pointed at the local server an
 | Tool-call parser              | `pythonic`     |
 | `trust_remote_code`           | enabled        |
 
-Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes` or `make claude-code SERVED_MODEL_NAME=my-model`.
+Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes` or `make cc SERVED_MODEL_NAME=my-model`.
 
 ## License
 
