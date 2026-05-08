@@ -38,6 +38,7 @@ patch:
 	$(PY) scripts/patch_vllm_gb10_gemma4_dflash_runtime.py
 
 serve:
+	PATH=$(CURDIR)/.venv/bin:$$PATH \
 	VLLM_DISABLE_COMPILE_CACHE=1 \
 	$(VLLM) serve google/gemma-4-26B-A4B-it \
 		--served-model-name $(SERVED_MODEL_NAME) \
