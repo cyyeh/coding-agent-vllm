@@ -152,17 +152,47 @@ def phase_sampling_sweep() -> None:
         print(f"ok ({elapsed:.1f}s) -> {text.strip()[:48]!r}")
 
 
+def phase_concurrent_decode() -> None:
+    print("phase C: concurrent decode")
+
+    print("  [C.1 batch=2 concurrent (~120 tokens, temp=0.7 top_p=0.95)] ...",
+          end=" ", flush=True)
+    prompt_120 = make_prompt(120)
+    t0 = time.monotonic()
+    results = run_concurrent([
+        (prompt_120, {"temperature": 0.7, "top_p": 0.95, "max_tokens": 64}),
+        (prompt_120, {"temperature": 0.7, "top_p": 0.95, "max_tokens": 64}),
+    ])
+    elapsed = time.monotonic() - t0
+    summary = " | ".join(text.strip()[:24] for _, text in results)
+    print(f"ok ({elapsed:.1f}s) -> {summary!r}")
+
+    print("  [C.2 batch=3 concurrent (~400 tokens, greedy)] ...",
+          end=" ", flush=True)
+    prompt_400 = make_prompt(400)
+    t0 = time.monotonic()
+    results = run_concurrent([
+        (prompt_400, {"max_tokens": 64}),
+        (prompt_400, {"max_tokens": 64}),
+        (prompt_400, {"max_tokens": 64}),
+    ])
+    elapsed = time.monotonic() - t0
+    summary = " | ".join(text.strip()[:24] for _, text in results)
+    print(f"ok ({elapsed:.1f}s) -> {summary!r}")
+
+
 def main() -> int:
     print(f"warming up {BASE_URL} (model={MODEL})", flush=True)
     t_start = time.monotonic()
     try:
         phase_prefill_sweep()
         phase_sampling_sweep()
+        phase_concurrent_decode()
     except urllib.error.URLError as exc:
         print(f"FAIL: {exc}")
         return 1
     total = time.monotonic() - t_start
-    print(f"warmup complete (total: {total:.1f}s, steps: 11)")
+    print(f"warmup complete (total: {total:.1f}s, steps: 13)")
     return 0
 
 
