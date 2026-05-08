@@ -87,6 +87,44 @@ make codex
 
 This launches Codex with `model_provider=vllm` and the OpenAI Responses API wire format pointing at the local vLLM server. Provider settings are passed inline via Codex `-c` flags, so no `~/.codex/config.toml` edits are needed. See the [vLLM × Codex guide](https://docs.vllm.ai/en/latest/serving/integrations/codex/) for details.
 
+## Benchmark
+
+With the server running in another shell, measure live request throughput, time-to-first-token (TTFT), and inter-token latency (ITL) using `vllm bench serve` via:
+
+```bash
+make bench           # synthetic random prompts, no download
+make bench-sharegpt  # real multi-turn chat workload, downloads ShareGPT V3 on first run
+```
+
+Run `make warmup` first — otherwise the first ~10 requests trigger Triton JIT compiles and skew TTFT/ITL.
+
+### `make bench` (random dataset)
+
+Hits `/v1/completions` with synthetic random tokens. Fastest path to a number; no filesystem state.
+
+Tunables (defaults shown):
+
+| Variable                 | Default | Meaning                                                  |
+| ------------------------ | ------- | -------------------------------------------------------- |
+| `BENCH_NUM_PROMPTS`      | `200`   | Total requests sent during the run.                      |
+| `BENCH_REQUEST_RATE`     | `inf`   | Requests per second. `inf` = max throughput, no pacing.  |
+| `BENCH_RANDOM_INPUT_LEN` | `1024`  | Synthetic prompt length in tokens.                       |
+| `BENCH_RANDOM_OUTPUT_LEN`| `256`   | Synthetic decode length in tokens.                       |
+
+Example: `make bench BENCH_NUM_PROMPTS=500 BENCH_REQUEST_RATE=8`.
+
+### `make bench-sharegpt` (real chat workload)
+
+Hits `/v1/chat/completions` with ShareGPT V3 multi-turn conversations — the same code path Claude Code and Codex use, including chat templating overhead. Use this when the number you want is "what will real agent traffic look like".
+
+The dataset (~620 MB JSON) is downloaded on first invocation to `data/ShareGPT_V3_unfiltered_cleaned_split.json` and cached. `data/` is gitignored. Override `SHAREGPT_PATH` to use an existing copy, or `SHAREGPT_URL` to pull from a different mirror.
+
+`BENCH_NUM_PROMPTS` and `BENCH_REQUEST_RATE` apply here too.
+
+### Compare with vs without speculative decoding
+
+To quantify the DFlash speedup on this stack, run `make bench` (or `make bench-sharegpt`) twice — once with `make serve` running, once with `make serve-no-spec` running. The delta in `Output token throughput` and `Mean ITL` reported by `vllm bench serve` is the speedup attributable to DFlash speculative decoding.
+
 ## Configuration
 
 | Setting                     | Value                              |
@@ -103,7 +141,7 @@ This launches Codex with `model_provider=vllm` and the OpenAI Responses API wire
 | Reasoning parser            | `gemma4`                           |
 | `trust_remote_code`         | enabled                            |
 
-Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes`, `make cc SERVED_MODEL_NAME=my-model`, or `make codex VLLM_BASE_URL=http://remote:8000`.
+Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes`, `make cc SERVED_MODEL_NAME=my-model`, `make codex VLLM_BASE_URL=http://remote:8000`, or `make bench BENCH_NUM_PROMPTS=500`.
 
 ## License
 
