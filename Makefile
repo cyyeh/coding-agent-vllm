@@ -1,4 +1,4 @@
-.PHONY: help venv install patch serve serve-no-spec warmup warmup-diag chat cc codex
+.PHONY: help venv install patch serve serve-no-spec warmup warmup-diag chat cc codex bench bench-sharegpt
 
 ifneq (,$(wildcard .env))
     include .env
@@ -14,6 +14,10 @@ VLLM_BASE_URL ?= http://localhost:8000
 VLLM_API_KEY ?= dummy
 VLLM_PIN ?= 0.20.2rc1.dev140
 VLLM_INDEX_URL ?= https://wheels.vllm.ai/nightly
+BENCH_NUM_PROMPTS ?= 200
+BENCH_REQUEST_RATE ?= inf
+BENCH_RANDOM_INPUT_LEN ?= 1024
+BENCH_RANDOM_OUTPUT_LEN ?= 256
 
 help:
 	@echo "Targets:"
@@ -27,6 +31,7 @@ help:
 	@echo "  chat         Open an interactive chat session against the local vLLM server"
 	@echo "  cc           Launch Claude Code routed to the local vLLM server"
 	@echo "  codex        Launch Codex routed to the local vLLM server"
+	@echo "  bench        Benchmark the running server with vllm bench serve (random dataset)"
 
 venv:
 	uv venv
@@ -99,3 +104,15 @@ codex:
 		-c 'model_providers.vllm.env_key="VLLM_API_KEY"' \
 		-c 'model_providers.vllm.base_url="$(VLLM_BASE_URL)/v1"' \
 		-c 'model_providers.vllm.wire_api="responses"'
+
+bench:
+	$(VLLM) bench serve \
+		--backend vllm \
+		--model $(SERVED_MODEL_NAME) \
+		--base-url $(VLLM_BASE_URL) \
+		--endpoint /v1/completions \
+		--dataset-name random \
+		--random-input-len $(BENCH_RANDOM_INPUT_LEN) \
+		--random-output-len $(BENCH_RANDOM_OUTPUT_LEN) \
+		--num-prompts $(BENCH_NUM_PROMPTS) \
+		--request-rate $(BENCH_REQUEST_RATE)
