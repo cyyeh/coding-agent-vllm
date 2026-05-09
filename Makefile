@@ -8,6 +8,7 @@ endif
 
 VLLM ?= .venv/bin/vllm
 PY ?= .venv/bin/python
+HF_MODEL ?= google/gemma-4-26B-A4B-it
 SERVED_MODEL_NAME ?= vllm-model
 TOOL_CALL_PARSER ?= gemma4
 REASONING_PARSER ?= gemma4
@@ -51,7 +52,7 @@ patch:
 
 serve:
 	PATH=$(CURDIR)/.venv/bin:$$PATH \
-	$(VLLM) serve google/gemma-4-26B-A4B-it \
+	$(VLLM) serve $(HF_MODEL) \
 		--served-model-name $(SERVED_MODEL_NAME) \
 		--enable-auto-tool-choice \
 		--tool-call-parser $(TOOL_CALL_PARSER) \
@@ -65,7 +66,7 @@ serve:
 
 serve-no-spec:
 	PATH=$(CURDIR)/.venv/bin:$$PATH \
-	$(VLLM) serve google/gemma-4-26B-A4B-it \
+	$(VLLM) serve $(HF_MODEL) \
 		--served-model-name $(SERVED_MODEL_NAME) \
 		--enable-auto-tool-choice \
 		--tool-call-parser $(TOOL_CALL_PARSER) \
@@ -112,7 +113,8 @@ codex:
 bench:
 	$(VLLM) bench serve \
 		--backend vllm \
-		--model $(SERVED_MODEL_NAME) \
+		--model $(HF_MODEL) \
+		--served-model-name $(SERVED_MODEL_NAME) \
 		--base-url $(VLLM_BASE_URL) \
 		--endpoint /v1/completions \
 		--dataset-name random \
@@ -128,7 +130,8 @@ $(SHAREGPT_PATH):
 bench-sharegpt: $(SHAREGPT_PATH)
 	$(VLLM) bench serve \
 		--backend openai-chat \
-		--model $(SERVED_MODEL_NAME) \
+		--model $(HF_MODEL) \
+		--served-model-name $(SERVED_MODEL_NAME) \
 		--base-url $(VLLM_BASE_URL) \
 		--endpoint /v1/chat/completions \
 		--dataset-name sharegpt \
