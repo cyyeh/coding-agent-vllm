@@ -17,6 +17,7 @@ VLLM_API_KEY ?= dummy
 VLLM_PIN ?= 0.20.2rc1.dev140
 VLLM_INDEX_URL ?= https://wheels.vllm.ai/nightly
 LMCACHE_PIN ?= 0.4.4
+CUDA_HOME ?= /usr/local/cuda
 comma := ,
 BENCH_NUM_PROMPTS ?= 200
 BENCH_REQUEST_RATE ?= inf
@@ -59,7 +60,11 @@ install:
 	uv pip install -U --pre --torch-backend=auto \
 		--extra-index-url $(VLLM_INDEX_URL) \
 		"vllm==$(VLLM_PIN)"
-	uv pip install "lmcache==$(LMCACHE_PIN)"
+	CUDA_HOME=$(CUDA_HOME) uv pip install --no-build-isolation-package lmcache "lmcache==$(LMCACHE_PIN)"
+	# lmcache pulls nixl-cu12 transitively, but this host is CUDA 13. Swap to the cu13
+	# wheel so vLLM's optional `import nixl_ep` doesn't crash on a missing libcudart.so.12.
+	uv pip uninstall nixl-cu12 || true
+	uv pip install nixl-cu13
 	$(MAKE) patch
 
 patch:
