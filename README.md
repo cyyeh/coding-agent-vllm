@@ -69,14 +69,14 @@ This sweeps every M-bin that `fused_moe_kernel` selects a distinct `(BLOCK_SIZE_
 
 ## LMCache (optional KV-cache offload)
 
-Set `LMCACHE=1` to launch vLLM with [LMCache](https://github.com/LMCache/LMCache) enabled for a CPU + local-disk KV-cache offload tier on top of vLLM's GPU prefix cache. Useful here because Claude Code and Codex both repeat long system prompts and conversation prefixes across requests — the GPU prefix cache catches the in-memory tail, and LMCache extends it through host RAM and disk so hits survive eviction and server restarts.
+Set `LMCACHE=1` to enable [LMCache](https://github.com/LMCache/LMCache), a CPU + local-disk KV-cache offload tier that layers on top of vLLM's GPU prefix cache. Useful here because Claude Code and Codex both repeat long system prompts and conversation prefixes across requests — the GPU prefix cache catches the in-memory tail, and LMCache extends it through host RAM and disk so hits survive eviction and server restarts.
 
 ```bash
 LMCACHE=1 make serve            # spec-decode path with LMCache
 LMCACHE=1 make serve-no-spec    # no-spec path with LMCache
 ```
 
-The toggle works identically on both serve targets. `LMCACHE=0` (the default) leaves the recipes byte-for-byte unchanged.
+The toggle works identically on both serve targets. With `LMCACHE=0` (the default), the existing serve commands are unchanged — the only addition vs. the pre-LMCache recipes is an unconditional `mkdir -p $(LMCACHE_DISK_PATH)` prelude.
 
 ### Tunables
 
@@ -87,11 +87,13 @@ The toggle works identically on both serve targets. `LMCACHE=0` (the default) le
 | `LMCACHE_DISK_PATH`           | `<repo>/data/lmcache` | Persistent disk-tier directory. Lives under the gitignored `data/`. |
 | `LMCACHE_MAX_LOCAL_DISK_SIZE` | `50`                  | GB of disk dedicated to the persistent tier.                        |
 
+The chunk size is fixed at 256 tokens. To change it, edit `LMCACHE_CHUNK_SIZE` inside `LMCACHE_ENV` in the Makefile.
+
 Override at invocation, e.g. `LMCACHE=1 LMCACHE_MAX_LOCAL_CPU_SIZE=40 make serve`.
 
 ### Verifying it is live
 
-Server logs include `LMCache` lines on hit/miss; grep the serve output. The disk tier populates `data/lmcache/` as the cache warms — an empty directory after several requests is a sign LMCache did not initialize. After a restart, hits against the same prompts should arrive faster than a fresh boot, since the disk tier persists.
+The disk tier populates `data/lmcache/` as the cache warms — an empty directory after several requests is a sign LMCache did not initialize. Server logs typically also include `LMCache` lines on hit/miss; grep the serve output. After a restart, hits against the same prompts should arrive faster than a fresh boot, since the disk tier persists.
 
 ### Caveats
 
