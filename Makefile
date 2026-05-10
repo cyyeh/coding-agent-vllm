@@ -40,9 +40,9 @@ LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector
 help:
 	@echo "Targets:"
 	@echo "  venv         Create the .venv with Python 3.12"
-	@echo "  install      Install pinned vLLM nightly and apply DGX Spark patches"
+	@echo "  install      Install pinned vLLM nightly + lmcache and apply DGX Spark patches"
 	@echo "  patch        Apply DGX Spark / DFlash patches to the installed vLLM (idempotent)"
-	@echo "  serve        Launch vLLM serving Gemma 4 26B with DFlash on DGX Spark"
+	@echo "  serve        Launch vLLM serving Gemma 4 26B with DFlash on DGX Spark (LMCACHE=1 for KV-cache offload)"
 	@echo "  serve-no-spec Launch vLLM serving Gemma 4 26B without speculative-config"
 	@echo "  warmup       JIT-compile Triton kernels by hitting the running server (run once after first serve)"
 	@echo "  warmup-diag  Like warmup but covers M-bin sweep + batch=2 and reports each new Triton compile"
