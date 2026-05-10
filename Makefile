@@ -26,17 +26,26 @@ BENCH_RANDOM_OUTPUT_LEN ?= 256
 SHAREGPT_PATH ?= data/ShareGPT_V3_unfiltered_cleaned_split.json
 SHAREGPT_URL ?= https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json
 LMCACHE ?= 0
+LMCACHE_LOCAL_CPU ?= false
 LMCACHE_MAX_LOCAL_CPU_SIZE ?= 20
 LMCACHE_DISK_PATH ?= $(CURDIR)/data/lmcache
 LMCACHE_MAX_LOCAL_DISK_SIZE ?= 50
+LMCACHE_USE_LAYERWISE ?= true
+LMCACHE_ENABLE_ASYNC_LOADING ?= true
+LMCACHE_SAVE_DECODE_CACHE ?= true
+LMCACHE_BLOCKING_TIMEOUT_SECS ?= 30
 LMCACHE_ENV = $(if $(filter 1,$(LMCACHE)),\
-	LMCACHE_LOCAL_CPU=true \
+	LMCACHE_LOCAL_CPU=$(LMCACHE_LOCAL_CPU) \
 	LMCACHE_MAX_LOCAL_CPU_SIZE=$(LMCACHE_MAX_LOCAL_CPU_SIZE) \
 	LMCACHE_LOCAL_DISK=file://$(LMCACHE_DISK_PATH) \
 	LMCACHE_MAX_LOCAL_DISK_SIZE=$(LMCACHE_MAX_LOCAL_DISK_SIZE) \
-	LMCACHE_CHUNK_SIZE=256,)
+	LMCACHE_CHUNK_SIZE=256 \
+	LMCACHE_USE_LAYERWISE=$(LMCACHE_USE_LAYERWISE) \
+	LMCACHE_ENABLE_ASYNC_LOADING=$(LMCACHE_ENABLE_ASYNC_LOADING) \
+	LMCACHE_SAVE_DECODE_CACHE=$(LMCACHE_SAVE_DECODE_CACHE) \
+	LMCACHE_BLOCKING_TIMEOUT_SECS=$(LMCACHE_BLOCKING_TIMEOUT_SECS),)
 
-LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1"$(comma)"kv_role":"kv_both"}',)
+LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1"$(comma)"kv_role":"kv_both"$(comma)"kv_connector_extra_config":{"use_layerwise":$(LMCACHE_USE_LAYERWISE)}}',)
 
 help:
 	@echo "Targets:"

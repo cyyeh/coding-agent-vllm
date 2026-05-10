@@ -83,9 +83,14 @@ The toggle works identically on both serve targets. With `LMCACHE=0` (the defaul
 | Variable                      | Default               | Meaning                                                             |
 | ----------------------------- | --------------------- | ------------------------------------------------------------------- |
 | `LMCACHE`                     | `0`                   | Toggle. Anything other than `1` disables LMCache.                   |
-| `LMCACHE_MAX_LOCAL_CPU_SIZE`  | `20`                  | GB of host RAM dedicated to the CPU tier.                           |
+| `LMCACHE_LOCAL_CPU`           | `false`               | Enable the in-memory CPU tier (pinned host RAM) above the disk tier. |
+| `LMCACHE_MAX_LOCAL_CPU_SIZE`  | `20`                  | GB of host RAM dedicated to the CPU tier (when `LMCACHE_LOCAL_CPU=true`). |
 | `LMCACHE_DISK_PATH`           | `<repo>/data/lmcache` | Persistent disk-tier directory. Lives under the gitignored `data/`. |
 | `LMCACHE_MAX_LOCAL_DISK_SIZE` | `50`                  | GB of disk dedicated to the persistent tier.                        |
+| `LMCACHE_USE_LAYERWISE`       | `true`                | Overlap KV transfer with per-layer forward instead of one shot per request. Requires PIECEWISE CUDA graphs. |
+| `LMCACHE_ENABLE_ASYNC_LOADING` | `true`               | Prefetch from the disk tier asynchronously instead of blocking per chunk. |
+| `LMCACHE_SAVE_DECODE_CACHE`   | `true`                | Cache decode-phase (assistant) tokens in addition to prefill, so prior turns hit on the next request. |
+| `LMCACHE_BLOCKING_TIMEOUT_SECS` | `30`                | Max seconds a blocking lookup waits before falling back to recompute. |
 
 The chunk size is fixed at 256 tokens. To change it, edit `LMCACHE_CHUNK_SIZE` inside `LMCACHE_ENV` in the Makefile.
 
