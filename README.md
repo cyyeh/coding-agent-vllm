@@ -67,6 +67,37 @@ make warmup-diag
 
 This sweeps every M-bin that `fused_moe_kernel` selects a distinct `(BLOCK_SIZE_M, num_warps, num_stages)` tuple for (≤32, 33–96, 97–128, 129–512, >512 small/medium/large), then runs a ~20K-token prefill and a batch=2 concurrent decode, snapshots `~/.triton/cache` between every step, and prints each new compile by kernel name and config. Use when a real workload still triggers a JIT compile that `make warmup` didn't catch, or to verify that a new vLLM/DFlash build hits the same kernel set as before.
 
+## LMCache (optional KV-cache offload)
+
+Set `LMCACHE=1` to launch vLLM with [LMCache](https://github.com/LMCache/LMCache) enabled for a CPU + local-disk KV-cache offload tier on top of vLLM's GPU prefix cache. Useful here because Claude Code and Codex both repeat long system prompts and conversation prefixes across requests — the GPU prefix cache catches the in-memory tail, and LMCache extends it through host RAM and disk so hits survive eviction and server restarts.
+
+```bash
+LMCACHE=1 make serve            # spec-decode path with LMCache
+LMCACHE=1 make serve-no-spec    # no-spec path with LMCache
+```
+
+The toggle works identically on both serve targets. `LMCACHE=0` (the default) leaves the recipes byte-for-byte unchanged.
+
+### Tunables
+
+| Variable                      | Default               | Meaning                                                             |
+| ----------------------------- | --------------------- | ------------------------------------------------------------------- |
+| `LMCACHE`                     | `0`                   | Toggle. Anything other than `1` disables LMCache.                   |
+| `LMCACHE_MAX_LOCAL_CPU_SIZE`  | `20`                  | GB of host RAM dedicated to the CPU tier.                           |
+| `LMCACHE_DISK_PATH`           | `<repo>/data/lmcache` | Persistent disk-tier directory. Lives under the gitignored `data/`. |
+| `LMCACHE_MAX_LOCAL_DISK_SIZE` | `50`                  | GB of disk dedicated to the persistent tier.                        |
+
+Override at invocation, e.g. `LMCACHE=1 LMCACHE_MAX_LOCAL_CPU_SIZE=40 make serve`.
+
+### Verifying it is live
+
+Server logs include `LMCache` lines on hit/miss; grep the serve output. The disk tier populates `data/lmcache/` as the cache warms — an empty directory after several requests is a sign LMCache did not initialize. After a restart, hits against the same prompts should arrive faster than a fresh boot, since the disk tier persists.
+
+### Caveats
+
+- `make bench` numbers are not directly comparable across `LMCACHE=0` and `LMCACHE=1`. Pick one setting and stick with it for any spec-vs-no-spec comparison.
+- A model swap (different `HF_MODEL`) leaves stale entries under `data/lmcache/` that count against the `LMCACHE_MAX_LOCAL_DISK_SIZE` cap. Clear with `rm -rf data/lmcache` between model swaps.
+
 ## Use with Claude Code
 
 In a second shell, with the server running:
@@ -141,7 +172,7 @@ To quantify the DFlash speedup on this stack, run `make bench` (or `make bench-s
 | Reasoning parser            | `gemma4`                           |
 | `trust_remote_code`         | enabled                            |
 
-Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes`, `make cc SERVED_MODEL_NAME=my-model`, `make codex VLLM_BASE_URL=http://remote:8000`, or `make bench BENCH_NUM_PROMPTS=500`.
+Override any of these on the command line, e.g. `make serve TOOL_CALL_PARSER=hermes`, `make cc SERVED_MODEL_NAME=my-model`, `make codex VLLM_BASE_URL=http://remote:8000`, `make bench BENCH_NUM_PROMPTS=500`, or `LMCACHE=1 make serve`.
 
 ## License
 
