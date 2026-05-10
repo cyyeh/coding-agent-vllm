@@ -16,6 +16,7 @@ VLLM_BASE_URL ?= http://localhost:8000
 VLLM_API_KEY ?= dummy
 VLLM_PIN ?= 0.20.2rc1.dev140
 VLLM_INDEX_URL ?= https://wheels.vllm.ai/nightly
+LMCACHE_PIN ?= 0.4.4
 BENCH_NUM_PROMPTS ?= 200
 BENCH_REQUEST_RATE ?= inf
 BENCH_RANDOM_INPUT_LEN ?= 1024
@@ -45,6 +46,7 @@ install:
 	uv pip install -U --pre --torch-backend=auto \
 		--extra-index-url $(VLLM_INDEX_URL) \
 		"vllm==$(VLLM_PIN)"
+	uv pip install "lmcache==$(LMCACHE_PIN)"
 	$(MAKE) patch
 
 patch:
