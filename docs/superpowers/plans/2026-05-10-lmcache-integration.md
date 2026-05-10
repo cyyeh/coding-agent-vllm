@@ -119,11 +119,12 @@ LMCACHE_MAX_LOCAL_DISK_SIZE ?= 50
 
 These are the runtime knobs (consumed by the serve recipes), as opposed to `LMCACHE_PIN` which is the install-time pin.
 
-- [ ] **Step 2: Add the two conditional fragments**
+- [ ] **Step 2: Add a `comma` constant and the two conditional fragments**
 
 Append immediately after the four variables from Step 1:
 
 ```makefile
+comma := ,
 LMCACHE_ENV = $(if $(filter 1,$(LMCACHE)),\
 	LMCACHE_LOCAL_CPU=true \
 	LMCACHE_MAX_LOCAL_CPU_SIZE=$(LMCACHE_MAX_LOCAL_CPU_SIZE) \
@@ -131,13 +132,13 @@ LMCACHE_ENV = $(if $(filter 1,$(LMCACHE)),\
 	LMCACHE_MAX_LOCAL_DISK_SIZE=$(LMCACHE_MAX_LOCAL_DISK_SIZE) \
 	LMCACHE_CHUNK_SIZE=256,)
 
-LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}',)
+LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1"$(comma)"kv_role":"kv_both"}',)
 ```
 
 Notes:
 - These are **recursive (`=`) variables**, not simply-expanded (`:=`). The `$(if ...)` must be re-evaluated each time the fragment is consumed so a per-invocation `LMCACHE=1` override takes effect.
 - Backslash-newline continues the `LMCACHE_ENV` definition across lines. The trailing `,)` closes the `$(if ...)` with an empty else-branch.
-- `LMCACHE_FLAGS` is one logical line (no continuations) because the JSON arg contains commas — splitting it would confuse the `$(if ...)` argument boundaries.
+- `comma := ,` is the standard GNU make idiom for embedding a literal comma inside a function-call argument. The `$(if cond,then,else)` function splits its arguments on commas before any shell quoting is considered, so the comma between `"LMCacheConnectorV1"` and `"kv_role"` in the JSON would otherwise be parsed as the then/else delimiter and silently truncate the value. The `$(comma)` substitution suppresses that.
 - Continuation lines of `LMCACHE_ENV` use TAB indentation in the snippet above. Make joins backslash-continued lines and collapses runs of leading whitespace, so the indentation is purely for readability — TAB matches the surrounding Makefile style and is what the project uses elsewhere.
 
 - [ ] **Step 3: Verify (static)**
@@ -148,30 +149,40 @@ Expected: identical to the output from Task 1 Step 3. Adding the new variables a
 Run: `make -p 2>/dev/null | grep -E '^LMCACHE'`
 Expected: shows `LMCACHE = 0`, `LMCACHE_MAX_LOCAL_CPU_SIZE = 20`, `LMCACHE_DISK_PATH = <cwd>/data/lmcache`, `LMCACHE_MAX_LOCAL_DISK_SIZE = 50`, `LMCACHE_PIN = 0.4.4`, `LMCACHE_ENV = $(if ...)`, `LMCACHE_FLAGS = $(if ...)`. The exact `=` vs `?=` and the un-expanded `$(if ...)` strings confirm the variables are loaded with the right flavors.
 
-Run the following include-style test to verify that the `$(if)` comma-splitting is NOT corrupting `LMCACHE_FLAGS`. **Note:** this check catches a real bug — the literal `,` inside the JSON collides with GNU make's `$(if cond,then,else)` argument-splitting; the fix is `comma := ,` plus `$(comma)` substitution. The two checks above do NOT catch this bug; only this test does:
+Run the following test to verify the comma fix in Step 2 is in place — i.e., `LMCACHE_FLAGS` is not being truncated by `$(if)` argument splitting. This guards against a regression if someone removes `comma := ,` or the `$(comma)` substitution:
 
 ```bash
-cat > /tmp/lmcache_test.mk << 'EOF'
-include Makefile
-
-test-lm-off:
-	@echo "[BEGIN]$(LMCACHE_FLAGS)[END]"
-
-test-lm-on:
-	@echo "[BEGIN]$(LMCACHE_FLAGS)[END]"
-EOF
-echo "--- LMCACHE=0 ---"
-make -f /tmp/lmcache_test.mk test-lm-off
-echo "--- LMCACHE=1 ---"
-LMCACHE=1 make -f /tmp/lmcache_test.mk test-lm-on
-rm /tmp/lmcache_test.mk
+make -p 2>/dev/null | grep '^LMCACHE_FLAGS' | head -1
 ```
 
-Note: the recipe lines use TAB indentation, not spaces.
+Expected output (one line):
+
+```
+LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1"$(comma)"kv_role":"kv_both"}',)
+```
+
+The `$(comma)` substitution must be visible in the un-expanded value. If you see a literal `,` between `"LMCacheConnectorV1"` and `"kv_role"` instead, the comma fix has been undone.
+
+For an end-to-end check that the expanded value is also intact, drop a tiny include-style file that uses `$(info)` (which writes to make's own stderr, not via the shell, so it preserves inner double-quotes):
+
+```bash
+cat > /tmp/lm_show.mk << 'EOF'
+include Makefile
+$(info LMCACHE_FLAGS=[$(LMCACHE_FLAGS)])
+show: ; @true
+EOF
+echo "--- LMCACHE=0 ---"
+make -f /tmp/lm_show.mk show LMCACHE=0 2>&1 | grep '^LMCACHE_FLAGS'
+echo "--- LMCACHE=1 ---"
+make -f /tmp/lm_show.mk show LMCACHE=1 2>&1 | grep '^LMCACHE_FLAGS'
+rm /tmp/lm_show.mk
+```
 
 Expected:
-- `LMCACHE=0` must produce `[BEGIN][END]` — no garbage after `[BEGIN]`. If it shows `kv_role:kv_both}',` or similar, the comma is splitting the `$(if)` else-branch.
-- `LMCACHE=1` must produce `[BEGIN]--kv-transfer-config '...LMCacheConnectorV1,kv_role...}'[END]` — the comma between `LMCacheConnectorV1` and `kv_role` must be present and the JSON must not be truncated. If the output cuts off after `LMCacheConnectorV1`, the comma is splitting the `$(if)` then-branch.
+- `LMCACHE=0`: `LMCACHE_FLAGS=[]` — empty.
+- `LMCACHE=1`: `LMCACHE_FLAGS=[--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}']` — full JSON, all four `"` quotes present, comma intact between the two key-value pairs.
+
+If `LMCACHE=1` shows truncated output (e.g., cuts off at `LMCacheConnectorV1`), the comma fix has been undone.
 
 - [ ] **Step 4: Commit**
 
