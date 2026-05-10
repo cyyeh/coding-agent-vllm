@@ -83,6 +83,8 @@ serve:
 		$(LMCACHE_FLAGS)
 
 serve-no-spec:
+	mkdir -p $(LMCACHE_DISK_PATH)
+	$(LMCACHE_ENV) \
 	PATH=$(CURDIR)/.venv/bin:$$PATH \
 	$(VLLM) serve $(HF_MODEL) \
 		--served-model-name $(SERVED_MODEL_NAME) \
@@ -93,7 +95,8 @@ serve-no-spec:
 		--max-num-batched-tokens 32768 \
 		--gpu-memory-utilization 0.80 \
 		--limit-mm-per-prompt '{"image":0,"video":0}' \
-		--trust-remote-code
+		--trust-remote-code \
+		$(LMCACHE_FLAGS)
 
 warmup:
 	$(PY) scripts/warmup.py
