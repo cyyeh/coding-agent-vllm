@@ -23,6 +23,18 @@ BENCH_RANDOM_INPUT_LEN ?= 1024
 BENCH_RANDOM_OUTPUT_LEN ?= 256
 SHAREGPT_PATH ?= data/ShareGPT_V3_unfiltered_cleaned_split.json
 SHAREGPT_URL ?= https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json
+LMCACHE ?= 0
+LMCACHE_MAX_LOCAL_CPU_SIZE ?= 20
+LMCACHE_DISK_PATH ?= $(CURDIR)/data/lmcache
+LMCACHE_MAX_LOCAL_DISK_SIZE ?= 50
+LMCACHE_ENV = $(if $(filter 1,$(LMCACHE)),\
+	LMCACHE_LOCAL_CPU=true \
+	LMCACHE_MAX_LOCAL_CPU_SIZE=$(LMCACHE_MAX_LOCAL_CPU_SIZE) \
+	LMCACHE_LOCAL_DISK=file://$(LMCACHE_DISK_PATH) \
+	LMCACHE_MAX_LOCAL_DISK_SIZE=$(LMCACHE_MAX_LOCAL_DISK_SIZE) \
+	LMCACHE_CHUNK_SIZE=256,)
+
+LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}',)
 
 help:
 	@echo "Targets:"
