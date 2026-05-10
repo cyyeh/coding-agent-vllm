@@ -17,6 +17,7 @@ VLLM_API_KEY ?= dummy
 VLLM_PIN ?= 0.20.2rc1.dev140
 VLLM_INDEX_URL ?= https://wheels.vllm.ai/nightly
 LMCACHE_PIN ?= 0.4.4
+comma := ,
 BENCH_NUM_PROMPTS ?= 200
 BENCH_REQUEST_RATE ?= inf
 BENCH_RANDOM_INPUT_LEN ?= 1024
@@ -34,7 +35,7 @@ LMCACHE_ENV = $(if $(filter 1,$(LMCACHE)),\
 	LMCACHE_MAX_LOCAL_DISK_SIZE=$(LMCACHE_MAX_LOCAL_DISK_SIZE) \
 	LMCACHE_CHUNK_SIZE=256,)
 
-LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}',)
+LMCACHE_FLAGS = $(if $(filter 1,$(LMCACHE)),--kv-transfer-config '{"kv_connector":"LMCacheConnectorV1"$(comma)"kv_role":"kv_both"}',)
 
 help:
 	@echo "Targets:"
